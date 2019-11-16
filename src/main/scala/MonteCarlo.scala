@@ -2,6 +2,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 object MonteCarlo {
   def main(args: Array[String]): Unit = {
+
     //Create a SparkContext to initialize Spark
     val conf = new SparkConf()
     conf.setMaster("local")
