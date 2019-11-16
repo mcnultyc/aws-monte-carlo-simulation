@@ -4,6 +4,7 @@ import time
 import pandas as pd
 import argparse as ap
 import sys
+from functools import reduce
 
 def download_history(companies):
   
