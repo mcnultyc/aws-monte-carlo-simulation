@@ -9,10 +9,10 @@
 The format of the input file will have the following format, where each value under 
 the tickers represents the percent change per day.
 
-| date  | GOOGL | GE    | AAPL  | GS    | OIL  |
-| ------|-------|-------|-------|-------|------|
-| 2019-11-14 | -1.52  | -1.41  | 0.027 | -0.55 | 1.37 |
-| 2019-11-13 | -0.14 | 0.98 | -0.99 | -0.18 | -1.95 |
+|date|GOOGL|GE|AAPL|GS|OIL|
+|-----|-----|-----|-----|-----|-----|
+|2019-11-14|-1.52|-1.41|0.027|-0.55|1.37 |
+|2019-11-13|-0.14|0.98|-0.99|-0.18|-1.95 |
 
 
 # Homework 3
