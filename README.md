@@ -1,3 +1,12 @@
+# Compiling data
+1. `pip install alpha_vantage`
+2. `pip install pandas`
+3. `python download_histories.sh -d`
+    * This will download 20 years of historical data for each
+    company listed in [companies_list.txt](companies_list.txt).
+    The file created will be named stock_data.csv.
+
+
 # Homework 3
 ### Description: you will gain experience with the Spark computational model in AWS cloud datacenter.
 ### Grade: 10% + bonus up to 3% for implementing this simulator using M/R and comparing it to your Spark program on [AWS EMR](https://aws.amazon.com/emr).
