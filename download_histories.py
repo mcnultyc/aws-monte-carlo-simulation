@@ -22,7 +22,7 @@ def download_history(companies):
     if counter >= 1 and counter % 5 == 0:
       time.sleep(60); # api call frequency is 5 per minute
     # read 100 days of stock data for company
-    dataframe, meta = ts.get_daily(symbol=company)
+    dataframe, meta = ts.get_daily(symbol=company,outputsize='full')
     dataframe.to_csv(index=True, path_or_buf=filename)
     dataframes.append(dataframe)
     counter += 1
@@ -77,5 +77,5 @@ if __name__ == '__main__':
   filename = os.path.join(os.getcwd(), 'stock_data.csv')
   print(filename)
   # merge data frames based on the dates
-  df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['date'], how='outer'), dataframes) 
+  df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['date'], how='inner'), dataframes) 
   df_merged.to_csv(index=True, path_or_buf=filename)
