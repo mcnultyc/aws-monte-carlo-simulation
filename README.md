@@ -2,9 +2,17 @@
 1. `pip install alpha_vantage`
 2. `pip install pandas`
 3. `python download_histories.sh -d`
-    * This will download 20 years of historical data for each
-    company listed in [companies_list.txt](companies_list.txt).
-    The file created will be named stock_data.csv.
+    * This will use the alpha vantage api to download 20 years of historical data 
+    for each company listed in [companies_list.txt](companies_list.txt). The file 
+    created will be named stock_data.csv.
+
+The format of the input file will have the following format, where each value under 
+the tickers represents the percent change per day.
+
+| date  | GOOGL | GE    | AAPL  | GS    | OIL  |
+| ------|-------|-------|-------|-------|------|
+| 2019-11-14 | -1.52  | -1.41  | 0.027 | -0.55 | 1.37 |
+| 2019-11-13 | -0.14 | 0.98 | -0.99 | -0.18 | -1.95 |
 
 
 # Homework 3
