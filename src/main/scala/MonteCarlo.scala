@@ -1,7 +1,32 @@
 import org.apache.spark.{SparkConf, SparkContext}
+import scala.collection.Map
+import scala.util.Random.shuffle
+import scala.util.Random.nextInt
+import scala.math.min
 
 object MonteCarlo {
+
+  def calculateGain(stockChanges: Set[(String, Float)],
+                    portfolioMap: Map[String, Float]): Float ={
+    // Calculate gain for day given the stock changes
+    stockChanges.map(x => portfolioMap.getOrElse(x._1, 0.0f)*x._2/100.0f).sum
+  }
+
+  def exploreInvestment(): Unit = {
+
+  }
+
   def main(args: Array[String]): Unit = {
+
+
+    val mylist = List(1,2,3,4)
+
+    val sample = shuffle(mylist).take(2)
+    println(sample)
+    val sample2 = shuffle(mylist).take(3)
+    println(sample2)
+    val sample3 = shuffle(mylist).take(1)
+    println(sample3)
 
     //Create a SparkContext to initialize Spark
     val conf = new SparkConf()
@@ -19,13 +44,18 @@ object MonteCarlo {
     })
 
     // Calculate total investments of portfolio
-    val totalInvestments = portfolioRDD.reduce((x, y) => ("total", x._2 + y._2))._2.longValue()
+    val totalInvestments: Float = portfolioRDD.reduce((x, y) => ("total", x._2 + y._2))._2.longValue()
     // Map each stock ticker in portfolio to its percentage of total investments
-    val portfolioMap = portfolioRDD.map(x => (x._1, x._2/totalInvestments)).collectAsMap()
+    val portfolioMap = portfolioRDD.collectAsMap()
 
     // Load the text into a Spark RDD, which is a distributed representation of each line of text
     val stocks = sc.textFile("src/main/resources/stock_data.csv")
+    // Get the header from the stocks data
+    val header = stocks.first.split(",").map(column => column.trim)
+    // Get tickers from header
+    val tickers = header.slice(1, header.size).toSet
 
+    // Convert stock data from csv to date and values
     val historyRDD = stocks.flatMap(line => {
       val columns = line.split(",").map(column => column.trim)
       // Skip the header of the file
@@ -38,8 +68,34 @@ object MonteCarlo {
         List((columns(0), values))
       }
     })
-    val historySize = historyRDD.count()
-    val numTrials = 1000
+
+    historyRDD.foreach(x => {
+      val (date, changes) = x
+      // Group tickers and changes into tuples
+      val stockChanges = tickers zip changes
+      // Calculate gain for the day
+      val gain = calculateGain(stockChanges, portfolioMap)
+
+      // Use heuristic to decide to buy/sell
+      if(gain < 0){
+        // Get tickers currently invested in
+        val keys = portfolioMap.keys.toSet
+      }
+      else if(gain > 0){
+        // Get tickers currently invested in
+        val keys = portfolioMap.keys.toSet
+        // Get tickers with no investments
+        val remTickers = shuffle(tickers.diff(keys))
+        // Calculate # of simulations to run at this decision point
+        val numSims = min(3, remTickers.size)
+        // Choose tickers to invest in for each simulation
+        val simsTickers = remTickers.take(numSims)
+
+      }
+
+      val investmentGain = totalInvestments + gain
+      println(f"date: $date, change: $gain, current money: $investmentGain")
+    })
 
 
     /*
