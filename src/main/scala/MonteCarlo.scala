@@ -1,36 +1,68 @@
+import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
-import scala.collection.Map
+
+import scala.collection.{Map, mutable}
 import scala.util.Random.shuffle
-import scala.util.Random.nextInt
-import scala.math.min
+
 
 object MonteCarlo {
 
-  def calculateGain(stockChanges: Set[(String, Float)],
-                    portfolioMap: Map[String, Float]): Float ={
+  def calculateGain(stockChanges: List[(String, Float)],
+                    portfolioMap: mutable.Map[String, Float]): Float ={
     // Calculate gain for day given the stock changes
     stockChanges.map(x => portfolioMap.getOrElse(x._1, 0.0f)*x._2/100.0f).sum
   }
 
-  def exploreInvestment(): Unit = {
+  def runSimulation(portfolioMap: mutable.Map[String, Float], tickers: Set[String],
+                     history: List[(String, Array[Float])]): Float = {
+    // Calculate total investments
+    var totalInvestments = portfolioMap.values.toList.sum
 
+    history.foreach(x => {
+      val (date, changes) = x
+      // Group tickers and changes into tuples
+      val stockChanges = (tickers zip changes).toList
+      // Calculate gain for the day
+      val gain = calculateGain(stockChanges, portfolioMap)
+      // Use heuristic to decide to buy/sell
+      if(gain < 0){
+        // Get ticker currently invested in
+        val investedTickers = shuffle(portfolioMap.keys.toSet)
+        if(investedTickers.size > 0){
+          // Select a ticker to sell
+          val droppedTicker = investedTickers.head
+          // Get tickers with no investments, excluding ticker to be dropped
+          val remTickers = (tickers -- investedTickers) - droppedTicker
+          if(remTickers.size > 0){
+            // Select a ticker to reinvest previous investment
+            val newInvestedTicker = shuffle(remTickers).head
+            // Transfer investment into selected ticker
+            portfolioMap(newInvestedTicker) = portfolioMap(droppedTicker)
+            portfolioMap(droppedTicker) = 0.0f
+          }
+        }
+      }
+      else if(gain > 0){
+        // Get tickers currently invested in
+        val investedTickers = portfolioMap.keys.toSet
+        // Get tickers with no investments
+        val remTickers = tickers -- investedTickers
+        if(remTickers.size > 0){
+          val newInvestedTicker = shuffle(remTickers).head
+          // Reinvest gain into selected ticker
+          portfolioMap(newInvestedTicker) = gain
+        }
+      }
+      totalInvestments += gain
+    })
+    totalInvestments
   }
 
   def main(args: Array[String]): Unit = {
 
-
-    val mylist = List(1,2,3,4)
-
-    val sample = shuffle(mylist).take(2)
-    println(sample)
-    val sample2 = shuffle(mylist).take(3)
-    println(sample2)
-    val sample3 = shuffle(mylist).take(1)
-    println(sample3)
-
     //Create a SparkContext to initialize Spark
     val conf = new SparkConf()
-    conf.setMaster("local")
+    conf.setMaster("local[4]")
     conf.setAppName("MonteCarlo")
     val sc = new SparkContext(conf)
 
@@ -46,7 +78,8 @@ object MonteCarlo {
     // Calculate total investments of portfolio
     val totalInvestments: Float = portfolioRDD.reduce((x, y) => ("total", x._2 + y._2))._2.longValue()
     // Map each stock ticker in portfolio to its percentage of total investments
-    val portfolioMap = portfolioRDD.collectAsMap()
+    val map = portfolioRDD.collectAsMap()
+    val portfolioMap = mutable.Map[String, Float]() ++= map
 
     // Load the text into a Spark RDD, which is a distributed representation of each line of text
     val stocks = sc.textFile("src/main/resources/stock_data.csv")
@@ -68,53 +101,27 @@ object MonteCarlo {
         List((columns(0), values))
       }
     })
+    // Convert history RDD to scala list
+    val history = historyRDD.toLocalIterator.toList;
+    // Execute simulations in parallel and sort the results in ascending order
+    val trials = sc.parallelize(1 to 10000, 100)
+      .map(i => runSimulation(portfolioMap.clone(), tickers, history))
+      .sortBy(x => x, true)
 
-    historyRDD.foreach(x => {
-      val (date, changes) = x
-      // Group tickers and changes into tuples
-      val stockChanges = tickers zip changes
-      // Calculate gain for the day
-      val gain = calculateGain(stockChanges, portfolioMap)
 
-      // Use heuristic to decide to buy/sell
-      if(gain < 0){
-        // Get tickers currently invested in
-        val keys = portfolioMap.keys.toSet
-      }
-      else if(gain > 0){
-        // Get tickers currently invested in
-        val keys = portfolioMap.keys.toSet
-        // Get tickers with no investments
-        val remTickers = shuffle(tickers.diff(keys))
-        // Calculate # of simulations to run at this decision point
-        val numSims = min(3, remTickers.size)
-        // Choose tickers to invest in for each simulation
-        val simsTickers = remTickers.take(numSims)
-
-      }
-
-      val investmentGain = totalInvestments + gain
-      println(f"date: $date, change: $gain, current money: $investmentGain")
+    val size = 10000
+    // Group RDD index with their corresponding values
+    val trialLookup = trials.zipWithIndex().map(x => (x._2, x._1))
+    // List of percentiles for statistics
+    val percentiles = List(0.05, 0.25, 0.5, 0.75, 0.95)
+    percentiles.foreach(x =>{
+      // Calculate index for percentile
+      val index = (x * size.toFloat).toInt
+      val percentile = x * 100
+      val totalInvestment = trialLookup.lookup(index).head
+      println(s"$percentile percentile: $totalInvestment$$")
     })
 
-
-    /*
-    val input = "12-10-1999, 0.67, 0.89, 45.78,-90.84545"
-    val columns = input.split(",").map(column => column.trim)
-    val values = columns.slice(1, columns.size).map(column => column.toFloat)
-    values.foreach(value => println(value))
-    */
-    /*
-    //word count
-    val counts = textFile.flatMap(line => line.split(" "))
-      .map(word => (word, 1))
-      .reduceByKey(_ + _)
-
-    counts.foreach(println)
-    System.out.println("Total words: " + counts.count());
-    //counts.saveAsTextFile("/tmp/shakespeareWordCount")
-    counts.saveAsTextFile("hdfs:///tmp/shakespeareWordCount")
-
-     */
+    //counts.saveAsTextFile("hdfs:///tmp/shakespeareWordCount")
   }
 }
