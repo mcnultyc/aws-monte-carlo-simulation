@@ -14,7 +14,7 @@ object MonteCarlo {
   }
 
   def runSimulation(portfolioMap: mutable.Map[String, Float], tickers: Set[String],
-                     history: List[(String, Array[Float])]): Float = {
+                    history: List[(String, Array[Float])]): Float = {
     // Calculate total investments
     var totalInvestments = portfolioMap.values.toList.sum
 
@@ -62,11 +62,11 @@ object MonteCarlo {
 
     //Create a SparkContext to initialize Spark
     val conf = new SparkConf()
-    conf.setMaster("local[4]")
+    //conf.setMaster("local[4]")
     conf.setAppName("MonteCarlo")
     val sc = new SparkContext(conf)
 
-    val portfolio = sc.textFile("src/main/resources/portfolio.txt")
+    val portfolio = sc.textFile("s3n://wordcountanalysis3/portfolio.txt")
 
     // Get symbols and investments from user
     val portfolioRDD = portfolio.map(line => {
@@ -82,7 +82,7 @@ object MonteCarlo {
     val portfolioMap = mutable.Map[String, Float]() ++= map
 
     // Load the text into a Spark RDD, which is a distributed representation of each line of text
-    val stocks = sc.textFile("src/main/resources/stock_data.csv")
+    val stocks = sc.textFile("s3n://wordcountanalysis3/stock_data.csv")
     // Get the header from the stocks data
     val header = stocks.first.split(",").map(column => column.trim)
     // Get tickers from header
@@ -104,12 +104,12 @@ object MonteCarlo {
     // Convert history RDD to scala list
     val history = historyRDD.toLocalIterator.toList;
     // Execute simulations in parallel and sort the results in ascending order
-    val trials = sc.parallelize(1 to 10000, 100)
+    val trials = sc.parallelize(1 to 1000, 100)
       .map(i => runSimulation(portfolioMap.clone(), tickers, history))
       .sortBy(x => x, true)
 
 
-    val size = 10000
+    val size = 1000
     // Group RDD index with their corresponding values
     val trialLookup = trials.zipWithIndex().map(x => (x._2, x._1))
     // List of percentiles for statistics
@@ -122,6 +122,6 @@ object MonteCarlo {
       println(s"$percentile percentile: $totalInvestment$$")
     })
 
-    //counts.saveAsTextFile("hdfs:///tmp/shakespeareWordCount")
+    trials.saveAsTextFile("s3n://wordcountanalysis3/output.txt")
   }
 }
