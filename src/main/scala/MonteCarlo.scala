@@ -135,24 +135,38 @@ object MonteCarlo {
     // Group RDD index with their corresponding values
     val trialLookup = trials.zipWithIndex().map(x => (x._2, x._1))
     // List of percentiles for statistics
+    /*
     val percentiles = List(0.05, 0.25, 0.5, 0.75, 0.95)
     percentiles.foreach(x =>{
       // Calculate index for percentile
       val index = (x * size.toFloat).toInt
       val percentile = x * 100
       val totalInvestment = trialLookup.lookup(index).head
-      println(s"$percentile percentile: $totalInvestment$$")
+      //println(s"$percentile percentile: $totalInvestment$$")
     })
+    */
 
-    trials.saveAsTextFile("s3n://myanalysis/output.txt")
-    val mylst = List(1,2,3,4)
+    val percentiles = List(0.05, 0.25, 0.5, 0.75, 0.95)
+    val stats =
+      percentiles.map(x =>{
+        // Calculate index for percentile
+        val index = (x * size.toFloat).toInt
+        val percentile = x * 100
+        // Get investment for given percentiles
+        val totalInvestment = trialLookup.lookup(index).head
+        (percentile, totalInvestment)
+      })
+
+
+    //trials.saveAsTextFile("s3n://myanalysis/output.txt")
+    //val mylst = List(1,2,3,4)
     val writer =
-    new BufferedWriter(new OutputStreamWriter(new FileOutputStream("testing.txt")))
+    new BufferedWriter(new OutputStreamWriter(new FileOutputStream("stats.txt")))
     // Write investment percentiles to file
-    mylst.foreach(x => writer.write(x.toString()+"\n"))
+    stats.foreach(x => writer.write(x.toString()+"\n"))
     writer.close()
 
-    val request = new PutObjectRequest("myanalysis", "testing.txt", new File("testing.txt"));
+    val request = new PutObjectRequest("myanalysis", "stats.txt", new File("stats.txt"));
     val metadata = new ObjectMetadata();
     metadata.setContentType("plain/text");
     request.setMetadata(metadata);
