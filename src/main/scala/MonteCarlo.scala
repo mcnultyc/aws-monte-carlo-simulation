@@ -73,9 +73,17 @@ object MonteCarlo {
     conf.setAppName("MonteCarlo")
     val sc = new SparkContext(conf)
 
-        
+    val clientRegion = Regions.DEFAULT_REGION
+    
+    val s3Client = AmazonS3ClientBuilder.standard()
+      .withRegion(clientRegion)
+      .build();       
 
-    val portfolio = sc.textFile("s3n://wordcountanalysis3/portfolio.txt")
+    val myObject = s3Client.getObject("myanalysis", "test.txt")
+    myObject.close() 
+ 
+
+    val portfolio = sc.textFile("s3n://myanalysis/portfolio.txt")
 
     // Get symbols and investments from user
     val portfolioRDD = portfolio.map(line => {
@@ -91,7 +99,7 @@ object MonteCarlo {
     val portfolioMap = mutable.Map[String, Float]() ++= map
 
     // Load the text into a Spark RDD, which is a distributed representation of each line of text
-    val stocks = sc.textFile("s3n://wordcountanalysis3/stock_data.csv")
+    val stocks = sc.textFile("s3n://myanalysis/stock_data.csv")
     // Get the header from the stocks data
     val header = stocks.first.split(",").map(column => column.trim)
     // Get tickers from header
@@ -131,6 +139,6 @@ object MonteCarlo {
       println(s"$percentile percentile: $totalInvestment$$")
     })
 
-    trials.saveAsTextFile("s3n://wordcountanalysis3/output.txt")
+    trials.saveAsTextFile("s3n://myanalysis/output.txt")
   }
 }
