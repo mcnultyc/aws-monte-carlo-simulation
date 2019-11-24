@@ -4,6 +4,13 @@ import org.apache.spark.{SparkConf, SparkContext}
 import scala.collection.{Map, mutable}
 import scala.util.Random.shuffle
 
+import com.amazonaws.AmazonServiceException
+import com.amazonaws.SdkClientException
+import com.amazonaws.regions.Regions
+import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.s3.model.ObjectMetadata
+import com.amazonaws.services.s3.model.PutObjectRequest
 
 object MonteCarlo {
 
@@ -65,6 +72,8 @@ object MonteCarlo {
     //conf.setMaster("local[4]")
     conf.setAppName("MonteCarlo")
     val sc = new SparkContext(conf)
+
+        
 
     val portfolio = sc.textFile("s3n://wordcountanalysis3/portfolio.txt")
 
