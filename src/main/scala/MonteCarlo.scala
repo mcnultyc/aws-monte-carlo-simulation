@@ -12,6 +12,9 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.s3.model.PutObjectRequest
 
+import java.io.File
+import java.io.{BufferedWriter,OutputStreamWriter,FileOutputStream}
+
 object MonteCarlo {
 
   def calculateGain(stockChanges: List[(String, Float)],
@@ -79,7 +82,7 @@ object MonteCarlo {
       .withRegion(clientRegion)
       .build();       
 
-    s3Client.putObject("myanalysis", "myoutput.txt", "Uploaded String Object");
+    //s3Client.putObject("myanalysis", "myoutput.txt", "Uploaded String Object");
 
     //val myObject = s3Client.getObject("myanalysis", "test.txt")
     //myObject.close() 
@@ -142,11 +145,17 @@ object MonteCarlo {
     })
 
     trials.saveAsTextFile("s3n://myanalysis/output.txt")
-
+    val mylst = List(1,2,3,4)
     val writer =
-    new BufferedWriter(new OutputStreamWriter(new FileOutputStream("stats.txt")))
+    new BufferedWriter(new OutputStreamWriter(new FileOutputStream("testing.txt")))
     // Write investment percentiles to file
-    stats.foreach(x => writer.write(x.toString()+"\n"))
+    mylst.foreach(x => writer.write(x.toString()+"\n"))
     writer.close()
+
+    val request = new PutObjectRequest("myanalysis", "testing.txt", new File("testing.txt"));
+    val metadata = new ObjectMetadata();
+    metadata.setContentType("plain/text");
+    request.setMetadata(metadata);
+    s3Client.putObject(request);
   }
 }
