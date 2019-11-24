@@ -73,14 +73,16 @@ object MonteCarlo {
     conf.setAppName("MonteCarlo")
     val sc = new SparkContext(conf)
 
-    val clientRegion = Regions.DEFAULT_REGION
+    val clientRegion = Regions.US_EAST_1
     
     val s3Client = AmazonS3ClientBuilder.standard()
       .withRegion(clientRegion)
       .build();       
 
-    val myObject = s3Client.getObject("myanalysis", "test.txt")
-    myObject.close() 
+    s3Client.putObject("myanalysis", "myoutput.txt", "Uploaded String Object");
+
+    //val myObject = s3Client.getObject("myanalysis", "test.txt")
+    //myObject.close() 
  
 
     val portfolio = sc.textFile("s3n://myanalysis/portfolio.txt")
@@ -140,5 +142,11 @@ object MonteCarlo {
     })
 
     trials.saveAsTextFile("s3n://myanalysis/output.txt")
+
+    val writer =
+    new BufferedWriter(new OutputStreamWriter(new FileOutputStream("stats.txt")))
+    // Write investment percentiles to file
+    stats.foreach(x => writer.write(x.toString()+"\n"))
+    writer.close()
   }
 }
