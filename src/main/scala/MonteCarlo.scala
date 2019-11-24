@@ -80,13 +80,7 @@ object MonteCarlo {
     
     val s3Client = AmazonS3ClientBuilder.standard()
       .withRegion(clientRegion)
-      .build();       
-
-    //s3Client.putObject("myanalysis", "myoutput.txt", "Uploaded String Object");
-
-    //val myObject = s3Client.getObject("myanalysis", "test.txt")
-    //myObject.close() 
- 
+      .build();        
 
     val portfolio = sc.textFile("s3n://myanalysis/portfolio.txt")
 
@@ -130,22 +124,10 @@ object MonteCarlo {
       .map(i => runSimulation(portfolioMap.clone(), tickers, history))
       .sortBy(x => x, true)
 
-
     val size = 1000
     // Group RDD index with their corresponding values
     val trialLookup = trials.zipWithIndex().map(x => (x._2, x._1))
     // List of percentiles for statistics
-    /*
-    val percentiles = List(0.05, 0.25, 0.5, 0.75, 0.95)
-    percentiles.foreach(x =>{
-      // Calculate index for percentile
-      val index = (x * size.toFloat).toInt
-      val percentile = x * 100
-      val totalInvestment = trialLookup.lookup(index).head
-      //println(s"$percentile percentile: $totalInvestment$$")
-    })
-    */
-
     val percentiles = List(0.05, 0.25, 0.5, 0.75, 0.95)
     val stats =
       percentiles.map(x =>{
@@ -157,9 +139,6 @@ object MonteCarlo {
         (percentile, totalInvestment)
       })
 
-
-    //trials.saveAsTextFile("s3n://myanalysis/output.txt")
-    //val mylst = List(1,2,3,4)
     val writer =
     new BufferedWriter(new OutputStreamWriter(new FileOutputStream("stats.txt")))
     // Write investment percentiles to file
