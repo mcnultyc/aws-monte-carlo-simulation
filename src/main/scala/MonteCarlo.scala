@@ -11,9 +11,15 @@ import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.s3.model.PutObjectRequest
+import com.amazonaws.services.s3.model.GetObjectRequest
 
 import java.io.File
 import java.io.{BufferedWriter,OutputStreamWriter,FileOutputStream}
+
+import java.io.InputStream
+import java.io.InputStreamReader
+
+import com.typesafe.config.ConfigFactory
 
 object MonteCarlo {
 
@@ -82,7 +88,12 @@ object MonteCarlo {
       .withRegion(clientRegion)
       .build();        
 
-    val portfolio = sc.textFile("s3n://myanalysis/portfolio.txt")
+    val configObject = s3Client.getObject(new GetObjectRequest("myanalysis2", "montecarlo.conf"))
+    val objectData = configObject.getObjectContent()
+    val reader = new InputStreamReader(objectData)
+    val config = ConfigFactory.parseReader(reader) 
+
+    val portfolio = sc.textFile("s3n://myanalysis2/portfolio.txt")
 
     // Get symbols and investments from user
     val portfolioRDD = portfolio.map(line => {
@@ -98,7 +109,7 @@ object MonteCarlo {
     val portfolioMap = mutable.Map[String, Float]() ++= map
 
     // Load the text into a Spark RDD, which is a distributed representation of each line of text
-    val stocks = sc.textFile("s3n://myanalysis/stock_data.csv")
+    val stocks = sc.textFile("s3n://myanalysis2/stock_data.csv")
     // Get the header from the stocks data
     val header = stocks.first.split(",").map(column => column.trim)
     // Get tickers from header
@@ -117,14 +128,14 @@ object MonteCarlo {
         List((columns(0), values))
       }
     })
+    val size = config.getInt("sims.numSims")
     // Convert history RDD to scala list
     val history = historyRDD.toLocalIterator.toList;
     // Execute simulations in parallel and sort the results in ascending order
-    val trials = sc.parallelize(1 to 1000, 100)
+    val trials = sc.parallelize(1 to size, 100)
       .map(i => runSimulation(portfolioMap.clone(), tickers, history))
-      .sortBy(x => x, true)
-
-    val size = 1000
+      .sortBy(x => x, true, 1)
+ 
     // Group RDD index with their corresponding values
     val trialLookup = trials.zipWithIndex().map(x => (x._2, x._1))
     // List of percentiles for statistics
@@ -145,7 +156,7 @@ object MonteCarlo {
     stats.foreach(x => writer.write(x.toString()+"\n"))
     writer.close()
 
-    val request = new PutObjectRequest("myanalysis", "stats.txt", new File("stats.txt"));
+    val request = new PutObjectRequest("myanalysis2", "stats.txt", new File("stats.txt"));
     val metadata = new ObjectMetadata();
     metadata.setContentType("plain/text");
     request.setMetadata(metadata);
