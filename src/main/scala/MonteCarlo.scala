@@ -15,13 +15,16 @@ import com.amazonaws.services.s3.model.GetObjectRequest
 
 import java.io.File
 import java.io.{BufferedWriter,OutputStreamWriter,FileOutputStream}
-
 import java.io.InputStream
 import java.io.InputStreamReader
 
 import com.typesafe.config.ConfigFactory
 
+import org.slf4j.{Logger, LoggerFactory}
+
 object MonteCarlo {
+
+  val logger = LoggerFactory.getLogger(MonteCarlo.getClass)
 
   def calculateGain(stockChanges: List[(String, Float)],
                     portfolioMap: mutable.Map[String, Float]): Float ={
@@ -29,12 +32,26 @@ object MonteCarlo {
     stockChanges.map(x => portfolioMap.getOrElse(x._1, 0.0f)*x._2/100.0f).sum
   }
 
+
   def runSimulation(portfolioMap: mutable.Map[String, Float], tickers: Set[String],
                     history: List[(String, Array[Float])]): Float = {
+    // Check for invalid portfolio or history
+    if(portfolioMap.size == 0 || history.size == 0){
+      return 0f
+    }
     // Calculate total investments
     var totalInvestments = portfolioMap.values.toList.sum
-
-    history.foreach(x => {
+    if(totalInvestments <= 0){
+      return 0f
+    }
+    val (_, changes) = history.head
+    // Check for historical data and ticker mismatch
+    if(changes.size != tickers.size){
+      return 0f
+    }
+    // Shuffle the entries in the historical data
+    val days = shuffle(history)
+    days.foreach(x => {
       val (date, changes) = x
       // Group tickers and changes into tuples
       val stockChanges = (tickers zip changes).toList
@@ -74,11 +91,11 @@ object MonteCarlo {
     totalInvestments
   }
 
+
   def main(args: Array[String]): Unit = {
 
     //Create a SparkContext to initialize Spark
     val conf = new SparkConf()
-    //conf.setMaster("local[4]")
     conf.setAppName("MonteCarlo")
     val sc = new SparkContext(conf)
 
@@ -88,13 +105,13 @@ object MonteCarlo {
       .withRegion(clientRegion)
       .build();        
 
-    val configObject = s3Client.getObject(new GetObjectRequest("myanalysis2", "montecarlo.conf"))
+    val configObject = s3Client.getObject(new GetObjectRequest("simanalysis", "montecarlo.conf"))
     val objectData = configObject.getObjectContent()
     val reader = new InputStreamReader(objectData)
     val config = ConfigFactory.parseReader(reader) 
-
-    val portfolio = sc.textFile("s3n://myanalysis2/portfolio.txt")
-
+    logger.info("Loading user portfolio...");
+    val portfolio = sc.textFile("s3n://simanalysis/portfolio.txt")
+    
     // Get symbols and investments from user
     val portfolioRDD = portfolio.map(line => {
       val columns = line.replace('$', ' ')
@@ -107,9 +124,10 @@ object MonteCarlo {
     // Map each stock ticker in portfolio to its percentage of total investments
     val map = portfolioRDD.collectAsMap()
     val portfolioMap = mutable.Map[String, Float]() ++= map
-
+    
+    logger.info("Loading historical stock data...");
     // Load the text into a Spark RDD, which is a distributed representation of each line of text
-    val stocks = sc.textFile("s3n://myanalysis2/stock_data.csv")
+    val stocks = sc.textFile("s3n://simanalysis/stock_data.csv")
     // Get the header from the stocks data
     val header = stocks.first.split(",").map(column => column.trim)
     // Get tickers from header
@@ -128,11 +146,14 @@ object MonteCarlo {
         List((columns(0), values))
       }
     })
-    val size = config.getInt("sims.numSims")
+    logger.info("Loading # of sims from config file...");
+    val numSims = config.getInt("sims.numSims")
     // Convert history RDD to scala list
     val history = historyRDD.toLocalIterator.toList;
+
+    logger.info(s"Running $numSims simulations...");
     // Execute simulations in parallel and sort the results in ascending order
-    val trials = sc.parallelize(1 to size, 100)
+    val trials = sc.parallelize(1 to numSims, 100)
       .map(i => runSimulation(portfolioMap.clone(), tickers, history))
       .sortBy(x => x, true, 1)
  
@@ -140,23 +161,31 @@ object MonteCarlo {
     val trialLookup = trials.zipWithIndex().map(x => (x._2, x._1))
     // List of percentiles for statistics
     val percentiles = List(0.05, 0.25, 0.5, 0.75, 0.95)
+
+    logger.info("Compiling statistics...");
     val stats =
       percentiles.map(x =>{
         // Calculate index for percentile
-        val index = (x * size.toFloat).toInt
+        val index = (x * numSims.toFloat).toInt
         val percentile = x * 100
         // Get investment for given percentiles
         val totalInvestment = trialLookup.lookup(index).head
         (percentile, totalInvestment)
       })
 
+
+    logger.info("Saving statistics to file...")
     val writer =
     new BufferedWriter(new OutputStreamWriter(new FileOutputStream("stats.txt")))
     // Write investment percentiles to file
-    stats.foreach(x => writer.write(x.toString()+"\n"))
+    stats.foreach(x => writer.write(s"Percentile: ${x._1}, Investment: ${x._2}$$\n"))
+    val mean = trials.mean()
+    val stddev = trials.stdev()
+    writer.write(s"Mean: $mean$$\n")
+    writer.write(s"Stddev: $stddev$$\n")    
     writer.close()
 
-    val request = new PutObjectRequest("myanalysis2", "stats.txt", new File("stats.txt"));
+    val request = new PutObjectRequest("simanalysis", "stats.txt", new File("stats.txt"));
     val metadata = new ObjectMetadata();
     metadata.setContentType("plain/text");
     request.setMetadata(metadata);
