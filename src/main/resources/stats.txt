@@ -1,0 +1,7 @@
+Percentile: 5.0, Investment: 550.5667$
+Percentile: 25.0, Investment: 569.44055$
+Percentile: 50.0, Investment: 613.60333$
+Percentile: 75.0, Investment: 1583.3345$
+Percentile: 95.0, Investment: 1773.0785$
+Mean: 973.5859350585933$
+Stddev: 491.27504509917986$
