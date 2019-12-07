@@ -1,0 +1,8 @@
+Hello carlos,
+Your hw3 is graded and your grade is 9.5 + 3% for running on EMR.
+
+-0.5%: Code is cluttered into a single file, could have been broken into modules/functions. Apart from that, 
+good work with simple and light implementation.
+
+Thank you,
+Mohammed Siddiq
