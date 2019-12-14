@@ -23,8 +23,7 @@ There are 8 unit tests and they can be ran my entering `sbt test` in the termina
 
 # Deploying to Amazon EMR
 
-The video tutorial showing how to deploy the spark application on amazon emr is provided
-here: https://youtu.be/7AzEDFJIBeM. You'll need to build the fat jar by entering
+You'll need to build the fat jar by entering
 `sbt assembly` in the project directory. This will be the jar submitted to amazon emr.
 Next you'll need to create an s3 bucket and upload the jar and input files. Lastly
 you'll have to create a cluster and submit the spark application. The output file
